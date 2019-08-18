@@ -10,6 +10,8 @@ sightY = 245
 
 while(True):
 
+    timeStamp = time.time()
+
     print("")
     print("--New F:")
     ret, img = cam.read()   #获取一帧图像
@@ -118,7 +120,11 @@ while(True):
             cv2.line(img, (x[target[targetNum][0]], y[target[targetNum][0]]), (x[target[targetNum][1]], y[target[targetNum][1]]), (0, 255, 255), 2)     #画连接线
             cv2.line(img, (locX[targetNum], locY[targetNum]), (sightX, sightY), (255, 0, 255), 2)   #画指向线
 
-
+    timeStamp = time.time() - timeStamp
+    fpsCalc = int(100 / timeStamp) / 100.0
+    cv2.putText(img2, str(timeStamp), (0, 30), cv2.FONT_HERSHEY_TRIPLEX, 0.5, (255, 255, 255), 1, 4)
+    cv2.putText(img2, str(fpsCalc), (0, 50), cv2.FONT_HERSHEY_TRIPLEX, 0.5, (255, 255, 255), 1, 4)
+    cv2.putText(img2, 'FPS MAX', (50, 50), cv2.FONT_HERSHEY_TRIPLEX, 0.5, (255, 255, 255), 1, 4)
     cv2.imshow('raw', img)  
     cv2.imshow('ter', img2) #进行显示
 
