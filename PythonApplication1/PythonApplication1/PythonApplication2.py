@@ -2,31 +2,39 @@ import cv2
 import time
 import math
 
+mode = "RED"       # 填写敌方阵营的颜色，可以是 RED 和 BLUE
+debug = False       # 一键开启调试模式
+
 cam = cv2.VideoCapture(0)
 kernel = cv2.getStructuringElement(cv2.MORPH_RECT, (5, 5))  # 定义结构元素
+kernel += 1
 
+# 定义准星位置
 sightX = 330
 sightY = 245
 
 while(True):
 
     timeStamp = time.time()
-
-    print("")
-    print("--New F:")
+    if debug:
+        print("")
+        print("--New F:")
     ret, img = cam.read()  # 获取一帧图像
     #img = cv2.imread("testImg.png")
 
+    # 图像通道分离
     blueImg, greenImg, redImg = cv2.split(img)  # 分离图像的RGB通道
-    img2 = cv2.subtract(blueImg, redImg)  # B通道-R通道
-    img2 = cv2.subtract(img2, greenImg)  # (B通道-R通道)-G通道
+    if mode == "BLUE":                          # 分析识别模式
+        img2 = cv2.subtract(blueImg, redImg)  # B通道-R通道
+    else:
+        img2 = cv2.subtract(redImg, blueImg)  # R通道-B通道
+    img2 = cv2.subtract(img2, greenImg)  # 上一步运算结果-G通道
 
     ret, img2 = cv2.threshold(img2, 50, 255, cv2.THRESH_BINARY)  # 图像二值化处理
-    img2 = cv2.morphologyEx(img2, cv2.MORPH_OPEN, kernel)  # 开运算
-    # img2 = cv2.dilate(img2, kernel）        #膨胀处理
+    img2 = cv2.morphologyEx(img2, cv2.MORPH_OPEN, kernel)  # 开运算，减少暗斑
     contours, hierarchy = cv2.findContours(
         img2, cv2.RETR_TREE, cv2.CHAIN_APPROX_SIMPLE)  # 获取轮廓
-    cv2.drawContours(img, contours, -1, (0, 0, 255), 2)  # 在原始图像上绘制轮廓以进行显示
+    cv2.drawContours(img, contours, -1, (0, 255, 0), 2)  # 在原始图像上绘制轮廓以进行显示
 
     n = 0
     x = []
@@ -41,17 +49,18 @@ while(True):
         angleCache = rect[2]  # 获取矩形的角度 (-90, 0]
 
         if heigthC > widthC:
-            if heigthC / widthC >= 2.1:  # 长宽比满足条件
-                # if widthC < heigthC and heigthC / widthC >= 2.1:        #灯条是竖直放置，长宽比满足条件
+            # if heigthC / widthC >= 2.1:  # 长宽比满足条件
+            if widthC < heigthC and heigthC / widthC >= 2.1:  # 灯条是竖直放置，长宽比满足条件
                 x.append(int(xCache))
                 y.append(int(yCache))
                 longSide.append(int(heigthC))
                 # shortSide.append(widthC)
                 angle.append(angleCache)
-                print("·X:", xCache)
-                print(" Y:", yCache)
-                print(" Long:", heigthC)
-                print(" Short:", widthC)
+                if debug:
+                    print("·X:", xCache)
+                    print(" Y:", yCache)
+                    print(" Long:", heigthC)
+                    print(" Short:", widthC)
                 n = n + 1  # 有效矩形计数
         else:
             if widthC / heigthC >= 2.1:  # 长宽比满足条件
@@ -60,10 +69,11 @@ while(True):
                 longSide.append(int(widthC))
                 # shortSide.append(heigthC)
                 angle.append(angleCache + 90)
-                print("·X:", xCache)
-                print(" Y:", yCache)
-                print(" Long:", widthC)
-                print(" Short:", heigthC)
+                if debug:
+                    print("·X:", xCache)
+                    print(" Y:", yCache)
+                    print(" Long:", widthC)
+                    print(" Short:", heigthC)
                 n = n + 1  # 有效矩形计数
 
     target = []  # 存储配对的两个灯条的编号 (L1, L2)
@@ -79,7 +89,8 @@ while(True):
                     (x[findCache] - x[count]) ** 2 + (y[findCache] - y[count]) ** 2)  # 求中心点连线长
                 calcCache = calcCache / \
                     (longSide[count] + longSide[findCache])  # 求快捷计算单位
-                print("·Scale:", calcCache)
+                if debug:
+                    print("·Scale:", calcCache)
                 if abs(angle[count] - angle[findCache]) < 10 and (1.0 < calcCache < 1.4):  # 满足匹配条件
                     # if abs(angle[count] - angle[findCache]) < 10 and (0.8 < calcCache < 1.2 or 1.8 < calcCache < 5.2):  #满足匹配条件
                     target.append((count, findCache))
@@ -94,8 +105,9 @@ while(True):
                     cv2.circle(
                         img, (locX[pairNum], locY[pairNum]), 8, (0, 0, 255), 2)
                     print("··Group", pairNum, ":")
-                    print("·L1:", target[pairNum][0])
-                    print("·L2:", target[pairNum][1])
+                    if debug:
+                        print("·L1:", target[pairNum][0])
+                        print("·L2:", target[pairNum][1])
                     print("")
 
                     pairNum = pairNum + 1  # 计数变量自增
@@ -112,10 +124,11 @@ while(True):
                     targetNum = count
                     disCalcCache = dis[count]
 
-            print("···FIND TARGET !!!")
-            print("·Target:", targetNum)
-            print("X:", locX[targetNum])
-            print("Y:", locY[targetNum])
+            if debug:
+                print("···FIND TARGET !!!")
+                print("·Target:", targetNum)
+                print("X:", locX[targetNum])
+                print("Y:", locY[targetNum])
             cv2.line(img, (locX[targetNum], 0),
                      (locX[targetNum], 480), (0, 255, 0), 1)  # 画竖线
             cv2.line(img, (0, locY[targetNum]),
@@ -127,13 +140,13 @@ while(True):
 
     # 画准星
     cv2.line(img, (sightX, sightY - 4),
-             (sightX, sightY - 9), (50, 250, 100), 1)  # 上
+             (sightX, sightY - 9), (50, 250, 100), 2)  # 上
     cv2.line(img, (sightX, sightY + 4),
-             (sightX, sightY + 9), (50, 250, 100), 1)  # 下
+             (sightX, sightY + 9), (50, 250, 100), 2)  # 下
     cv2.line(img, (sightX - 4, sightY),
-             (sightX - 9, sightY), (50, 250, 100), 1)  # 左
+             (sightX - 9, sightY), (50, 250, 100), 2)  # 左
     cv2.line(img, (sightX + 4, sightY),
-             (sightX + 9, sightY), (50, 250, 100), 1)  # 右
+             (sightX + 9, sightY), (50, 250, 100), 2)  # 右
 
     timeStamp = time.time() - timeStamp + 0.0001
     fpsCalc = int(100 / timeStamp) / 100.0
